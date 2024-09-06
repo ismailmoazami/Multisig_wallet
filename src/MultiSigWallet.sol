@@ -22,6 +22,26 @@ contract MultiSigWallet {
     Transaction[] public transactions;
     mapping(uint256 indexOfTx => mapping(address owner => bool isApprovedByUser)) public approved;
 
+    modifier onlyOwner() {
+        require(isOwner[msg.sender], "Not the owner!");
+        _;
+    }
+
+    modifier txExist(uint256 _txId) {
+        require(_txId < transactions.length, "Tx does not exist!");
+        _;
+    }
+
+    modifier notApproved(uint256 _txId) {
+        require(!approved[_txId][msg.sender], "Already approved!");
+        _;
+    }
+
+    modifier notExecuted(uint256 _txId) {
+        require(!transactions[_txId].executed, "Already executed!");
+        _;
+    }
+
     constructor(address[] memory _owners, uint256 _requiredApprovals) {
         require(_owners.length > 0);
         require(_requiredApprovals > 0 && _requiredApprovals < _owners.length);
@@ -35,6 +55,32 @@ contract MultiSigWallet {
 
         }
         numberOfSignsRequired = _requiredApprovals;
+    }
+
+    receive() external payable {
+        emit Deposit(msg.sender, msg.value);
+    }
+
+    function submit(address _to, uint256 _value, bytes calldata _data) external onlyOwner{
+        require(_value <= address(this).balance, "Exceeds the wallet address!");
+
+        transactions.push(Transaction({
+            to: _to,
+            value: _value,
+            data: _data, 
+            executed: false
+        }));
+        emit Submit(transactions.length - 1);
+    }
+
+    function approve(uint256 _txId) 
+    external
+    txExist(_txId)
+    notApproved(_txId)
+    notExecuted(_txId)
+    {
+        approved[_txId][msg.sender] = true;
+        emit Approve(msg.sender, _txId);
     }
 
     
