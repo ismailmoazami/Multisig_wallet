@@ -83,6 +83,40 @@ contract MultiSigWallet {
         emit Approve(msg.sender, _txId);
     }
 
-    
+    function execute(uint256 _txId) 
+    external
+    onlyOwner 
+    txExist(_txId) 
+    notExecuted(_txId)
+    {
+        require(_getApprovalCount(_txId) >= numberOfSignsRequired, "Not enough signs!");
+        
+        Transaction storage transaction = transactions[_txId];
+        transaction.executed = true;
+
+        (bool success, ) = transaction.to.call{value: transaction.value}(transaction.data);
+        require(success, "Transfer failed!");
+        emit Execute(_txId);
+    }
+
+    function revoke(uint256 _txId) 
+    external 
+    onlyOwner 
+    txExist(_txId) 
+    notExecuted(_txId)
+    {
+        require(approved[_txId][msg.sender], "Not approved!");
+        approved[_txId][msg.sender] = false;
+        emit Revoke(msg.sender, _txId);
+    }
+
+    // Internal Functions:
+    function _getApprovalCount(uint256 _txId) internal view returns(uint count) {
+        for(uint i = 0; i < owners.length; i++) {
+            if(approved[_txId][owners[i]]){
+                count += 1;
+            }
+        }
+    }
 
 }
